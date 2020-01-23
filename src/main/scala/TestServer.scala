@@ -13,8 +13,8 @@ import spray.json.{JsObject, JsString, JsValue, _}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.io.StdIn
 import scala.util.{Failure, Success}
-
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
+import sangria.marshalling.InputUnmarshaller
 import sangria.schema._
 
 object TestServer extends App with DefaultJsonProtocol{
@@ -22,6 +22,21 @@ object TestServer extends App with DefaultJsonProtocol{
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
+
+  /*
+  When using macros to derive context objects with methods you need to also declare an implicit JSON decoder for each of the input type associated with the method arguments. This is what is hinted in:
+  Please consider defining an implicit instance of `FromInput`
+
+  If you are using Spray JSON this would be something like:
+
+  object Main extends spray.json.DefaultJsonProtocol {
+     implicit val PermissionType = deriveObjectType[Ctx, Permission]()
+     implicit val PermissionInputType = deriveInputObjectType[PermissionInput]()
+     implicit val PermissionInputJson = jsonFormat2(PermissionInput)
+     implicit val MutationApiType = deriveContextObjectType[Ctx, MutationApi, Unit] {_.mutationApi}
+  }
+  implicit val inputUnmarshaller: InputUnmarshaller[JsObject] = DeriveFromObjectType(JsObject)
+ */
   //implicit val unmarshaller:Unmarshaller[RequestEntity, JsObject] =
   //Test String
   val jsonObject:String =
@@ -30,15 +45,15 @@ object TestServer extends App with DefaultJsonProtocol{
 //Marshalling and Unmarshalling
   def endpoint(requestEntity:JsValue)(implicit e: ExecutionContext): Route = {
 
-    val s:JsObject = requestEntity.asJsObject()
+    val jsString:JsObject = requestEntity.asJsObject()
 
-    val JsString(query) = s.fields("query")
+    val JsString(query) = jsString.fields("query")
 
-    val operation = s.fields.get("operationName") collect {
+    val operation = jsString.fields.get("operationName") collect {
       case JsString(op) ⇒ op
     }
 
-    val variables: JsObject= s.fields.get("variables") match {
+    val variables: JsObject= jsString.fields.get("variables") match {
       case Some(obj: JsObject) => obj
       case _ => JsObject.empty
     }
